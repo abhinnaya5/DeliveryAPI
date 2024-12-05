@@ -21,12 +21,90 @@ namespace DeliveryAPI.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetDish()
+        public async Task<IActionResult> GetDish([FromQuery]List<DishCategory> categories, bool vegetarian = false, DishSorting? sorting = null, int page = 1)
         {
             try
             {
+                var dishPaginationVMList = new List<DishPaginationViewModel>();
+                var dishVMList = new List<DishViewModel>();
+                var take = 5;
+                var skip = page == 1 ? 0 : take * (page-1);
+                var count = 0;
+
                 var dishes = await dbContext.Dishes.ToListAsync();
-                return Ok(dishes);
+                if (dishes != null && dishes.Count > 0)
+                {     
+                    if (categories != null && categories.Count > 0)
+                    {
+                        dishes = dishes.Where(x => categories.Contains(x.Category)).ToList();
+                    }
+                    if (vegetarian)
+                    {
+                        dishes = dishes.Where(x => x.IsVegetarian == vegetarian).ToList();
+                    }
+                    if (sorting.HasValue)
+                    {
+                        if (sorting == DishSorting.NameAsc)
+                        {
+                            dishes = dishes.OrderBy(x => x.Name).ToList();
+                        }
+                        else if (sorting == DishSorting.NameDesc)
+                        {
+                            dishes = dishes.OrderByDescending(x => x.Name).ToList();
+                        }
+                        else if (sorting == DishSorting.PriceAsc)
+                        {
+                            dishes = dishes.OrderBy(x => x.Price).ToList();
+                        }
+                        else if (sorting == DishSorting.PriceDesc)
+                        {
+                            dishes = dishes.OrderByDescending(x => x.Price).ToList();
+                        }
+                        else if (sorting == DishSorting.RatingAsc)
+                        {
+                            dishes = dishes.OrderBy(x => x.Rating).ToList();
+                        }
+                        else if (sorting == DishSorting.RatingDesc)
+                        {
+                            dishes = dishes.OrderByDescending(x => x.Rating).ToList();
+                        }
+                    }
+                    count = dishes.Count;
+                    dishes = dishes.Skip(skip).Take(take).ToList();
+
+                    foreach (var dish in dishes)
+                    {
+                        //decimal? ratingScore = null;
+                        //var rating = await dbContext.Rating.Where(x => x.DishId == dish.DishId).ToListAsync();
+                        //if (rating != null && rating.Count > 0)
+                        //{
+                        //    ratingScore = (decimal)rating.Average(x=>x.Value);
+                        //}
+                        dishVMList.Add(new DishViewModel()
+                        {
+                            DishId = dish.DishId,
+                            Name = dish.Name,
+                            Description = dish.Description,
+                            Image = dish.Image,
+                            Price = dish.Price,
+                            Rating = dish.Rating,
+                            Category = dish.Category.ToString(),
+                            IsVegetarian = dish.IsVegetarian
+                        });
+                    }
+
+                    dishPaginationVMList.Add(new DishPaginationViewModel()
+                    {
+                        Dishes = dishVMList,
+                        Pagination = new PaginationViewModel()
+                        {
+                            Current = page,
+                            Size = dishes.Count,
+                            Count = count,
+                        }
+                    });
+                }
+                return Ok(dishPaginationVMList);
             }
             catch (Exception e)
             {
